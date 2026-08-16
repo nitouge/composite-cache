@@ -1,0 +1,470 @@
+{
+  "groups": [
+    {
+      "name": "composite-cache.config",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig",
+      "sourceType": "io.github.nitouge.cache.prop.CompositeCacheProperties",
+      "description": "核心缓存配置（CacheConfig）."
+    },
+    {
+      "name": "composite-cache.config.composite",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$CompositeConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "组合缓存（L1/L2 类型）配置."
+    },
+    {
+      "name": "composite-cache.config.caffeine",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$CaffeineConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "L1 Caffeine 配置."
+    },
+    {
+      "name": "composite-cache.config.guava",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$GuavaConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "L1 Guava 配置（Caffeine 的可选替代）."
+    },
+    {
+      "name": "composite-cache.config.redis",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "L2 Redis（Redisson）配置：回源策略、TTL 抖动、运行期降级等."
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "跨节点缓存同步策略配置."
+    },
+    {
+      "name": "composite-cache.config.consistency",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "一致性增强配置（默认全关，开启后才接入写/删路径）."
+    },
+    {
+      "name": "composite-cache.config.penetration",
+      "type": "io.github.nitouge.cache.core.config.CacheConfig$PenetrationConfig",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "缓存穿透增强（布隆过滤器）配置."
+    }
+  ],
+  "properties": [
+    {
+      "name": "composite-cache.config.instance-id",
+      "type": "java.lang.String",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "缓存实例 ID，用于区分不同应用实例（默认基于 UUID 自动生成）."
+    },
+    {
+      "name": "composite-cache.config.allow-null-values",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "是否缓存空值（NullValue）以防止缓存穿透.",
+      "defaultValue": true
+    },
+    {
+      "name": "composite-cache.config.null-value-expire-time-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "NullValue 过期时间（秒），用于淘汰空值.",
+      "defaultValue": 60
+    },
+    {
+      "name": "composite-cache.config.null-value-max-size",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "NullValue 最大数量，防止内存溢出.",
+      "defaultValue": 3000
+    },
+    {
+      "name": "composite-cache.config.null-value-clear-period-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "NullValue 清理频率（秒）.",
+      "defaultValue": 10
+    },
+    {
+      "name": "composite-cache.config.dynamic",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "是否根据 cacheName 动态创建 Cache 实例.",
+      "defaultValue": true
+    },
+    {
+      "name": "composite-cache.config.cache-mode",
+      "type": "io.github.nitouge.cache.core.consts.enums.CacheModeEnum",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig",
+      "description": "缓存模式：L1（仅本地）/ L2（仅 Redis）/ L1_L2（组合，推荐）.",
+      "defaultValue": "L1_L2"
+    },
+    {
+      "name": "composite-cache.config.composite.l1-cache-type",
+      "type": "io.github.nitouge.cache.core.consts.enums.CacheTypeEnum",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CompositeConfig",
+      "description": "一级缓存类型：CAFFEINE（推荐）/ GUAVA.",
+      "defaultValue": "CAFFEINE"
+    },
+    {
+      "name": "composite-cache.config.composite.l2-cache-type",
+      "type": "io.github.nitouge.cache.core.consts.enums.CacheTypeEnum",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CompositeConfig",
+      "description": "二级缓存类型：REDIS.",
+      "defaultValue": "REDIS"
+    },
+    {
+      "name": "composite-cache.config.caffeine.manual-cache",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CaffeineConfig",
+      "description": "L1 是否为手动缓存（非 LoadingCache，不走加载器/刷新）.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.caffeine.auto-refresh-expire-cache",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CaffeineConfig",
+      "description": "是否定时刷新过期缓存.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.caffeine.refresh-thread-pool-size",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CaffeineConfig",
+      "description": "刷新调度线程池大小（默认 CPU 核数）."
+    },
+    {
+      "name": "composite-cache.config.caffeine.refresh-period",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CaffeineConfig",
+      "description": "缓存刷新频率（秒）.",
+      "defaultValue": 30
+    },
+    {
+      "name": "composite-cache.config.caffeine.publish-msg-period-milli-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CaffeineConfig",
+      "description": "同一 key 发布同步消息的最小间隔（毫秒）.",
+      "defaultValue": 500
+    },
+    {
+      "name": "composite-cache.config.guava.manual-cache",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$GuavaConfig",
+      "description": "L1 是否为手动缓存（非 LoadingCache）.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.guava.auto-refresh-expire-cache",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$GuavaConfig",
+      "description": "是否定时刷新过期缓存.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.guava.refresh-thread-pool-size",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$GuavaConfig",
+      "description": "刷新调度线程池大小（默认 CPU 核数）."
+    },
+    {
+      "name": "composite-cache.config.guava.refresh-period",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$GuavaConfig",
+      "description": "缓存刷新频率（秒）.",
+      "defaultValue": 30
+    },
+    {
+      "name": "composite-cache.config.guava.publish-msg-period-milli-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$GuavaConfig",
+      "description": "同一 key 发布同步消息的最小间隔（毫秒）.",
+      "defaultValue": 500
+    },
+    {
+      "name": "composite-cache.config.redis.try-lock",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "LOCK 回源策略下：tryLock 快速失败（true）还是 lock 阻塞等待（false）.",
+      "defaultValue": true
+    },
+    {
+      "name": "composite-cache.config.redis.load-strategy",
+      "type": "io.github.nitouge.cache.core.consts.enums.RedisLoadStrategyEnum",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "L2 失效后的回源策略：NONE / LOCK（分布式锁防击穿）/ LOGICAL_EXPIRE（逻辑过期）。未配置时按 lock 推导."
+    },
+    {
+      "name": "composite-cache.config.redis.logical-expire-physical-ttl-factor",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "逻辑过期模式下物理 TTL 相对逻辑 TTL 的放大倍数.",
+      "defaultValue": 2
+    },
+    {
+      "name": "composite-cache.config.redis.ttl-jitter-ratio",
+      "type": "java.lang.Double",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "TTL 随机抖动比例（缓解雪崩）：实际 TTL = base + random[0, base*ratio]，0 关闭.",
+      "defaultValue": 0.1
+    },
+    {
+      "name": "composite-cache.config.redis.degrade-enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "是否启用 L2 运行期降级（熔断）：Redis 异常时读降级/写跳过、恢复自愈。开启会吞掉 L2 连接类异常.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.redis.degrade-failure-threshold",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "连续失败达到该阈值则打开熔断.",
+      "defaultValue": 5
+    },
+    {
+      "name": "composite-cache.config.redis.degrade-open-millis",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "熔断打开持续时间（毫秒），到期半开试探.",
+      "defaultValue": 10000
+    },
+    {
+      "name": "composite-cache.config.redis.degrade-max-concurrent-loads",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "降级期间回源 DB 的最大并发数（保护 DB），<=0 不限制.",
+      "defaultValue": 0
+    },
+    {
+      "name": "composite-cache.config.redis.user-prefix",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "是否以 cacheName 作为 Redis key 前缀.",
+      "defaultValue": true
+    },
+    {
+      "name": "composite-cache.config.redis.support-batch",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "是否启用 Redis 批量管道.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.redis.batch-size",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "批量管道分片大小.",
+      "defaultValue": 50
+    },
+    {
+      "name": "composite-cache.config.redis.redisson-yaml-config",
+      "type": "java.lang.String",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "Redisson 的 YAML 配置文件路径（可选，用于自建 RedissonClient）."
+    },
+    {
+      "name": "composite-cache.config.redis.lock",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$RedisConfig",
+      "description": "加载数据时是否加锁.",
+      "defaultValue": false,
+      "deprecation": {
+        "reason": "已被回源策略取代.",
+        "replacement": "composite-cache.config.redis.load-strategy",
+        "level": "warning"
+      }
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.msg-type",
+      "type": "io.github.nitouge.cache.core.consts.enums.CacheMsgTypeEnum",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "description": "跨节点同步消息类型。目前仅 REDIS / KAFKA 可用；ROCKETMQ / RABBITMQ 未实现（运行时抛异常）."
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.topic",
+      "type": "java.lang.String",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "description": "缓存同步消息的 topic 名称.",
+      "defaultValue": "cache-sync-topic"
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.async",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "description": "是否异步发送同步消息.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.enhanced",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "description": "REDIS 同步是否使用可靠版（版本门控+去重+补偿）；false 回退基础版。仅对 msg-type=REDIS 生效.",
+      "defaultValue": true
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.enable-ack",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "description": "可靠版策略是否启用 ACK 确认.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.max-retries",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$CacheSyncPolicyConfig",
+      "description": "可靠版策略发布失败的最大重试次数.",
+      "defaultValue": 3
+    },
+    {
+      "name": "composite-cache.config.consistency.delayed-double-delete",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "description": "是否启用延迟双删（evict 后延迟再删一次，缓解主从/同步延迟脏数据）.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.consistency.delayed-double-delete-millis",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "description": "延迟双删的延迟时间（毫秒）.",
+      "defaultValue": 500
+    },
+    {
+      "name": "composite-cache.config.consistency.delete-compensation",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "description": "是否启用删除失败补偿（L2 删除失败记录、后台重试）。需 Redis 可用.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.consistency.delete-compensation-max-retry",
+      "type": "java.lang.Integer",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "description": "删除补偿最大重试次数.",
+      "defaultValue": 10
+    },
+    {
+      "name": "composite-cache.config.consistency.delete-compensation-interval-seconds",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "description": "删除补偿任务执行间隔（秒）.",
+      "defaultValue": 60
+    },
+    {
+      "name": "composite-cache.config.consistency.master-slave",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$ConsistencyConfig",
+      "description": "是否注册主从一致性处理器 Bean（写后强制读主，编程式使用）.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.penetration.bloom-enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$PenetrationConfig",
+      "description": "是否注册布隆过滤器 Bean（默认本地 Guava）。开启后仍需按 cacheName register/warmUp 才生效.",
+      "defaultValue": false
+    },
+    {
+      "name": "composite-cache.config.penetration.bloom-expected-insertions",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$PenetrationConfig",
+      "description": "布隆过滤器默认预期容量.",
+      "defaultValue": 1000000
+    },
+    {
+      "name": "composite-cache.config.penetration.bloom-fpp",
+      "type": "java.lang.Double",
+      "sourceType": "io.github.nitouge.cache.core.config.CacheConfig$PenetrationConfig",
+      "description": "布隆过滤器默认误判率.",
+      "defaultValue": 0.01
+    }
+  ],
+  "hints": [
+    {
+      "name": "composite-cache.key-generator-strategy",
+      "values": [
+        {
+          "value": "DEFAULT",
+          "description": "默认策略：单参数直接返回，多参数封装为 DefaultKey."
+        },
+        {
+          "value": "CUSTOM",
+          "description": "自定义策略：包含类名与方法名（推荐）."
+        },
+        {
+          "value": "SMART",
+          "description": "智能策略：自动处理大对象（MD5）."
+        }
+      ]
+    },
+    {
+      "name": "composite-cache.config.cache-mode",
+      "values": [
+        {
+          "value": "L1",
+          "description": "仅一级缓存（本地）."
+        },
+        {
+          "value": "L2",
+          "description": "仅二级缓存（Redis）."
+        },
+        {
+          "value": "L1_L2",
+          "description": "一级 + 二级组合（推荐）."
+        }
+      ]
+    },
+    {
+      "name": "composite-cache.config.composite.l1-cache-type",
+      "values": [
+        {
+          "value": "CAFFEINE",
+          "description": "Caffeine 作为一级缓存（推荐）."
+        },
+        {
+          "value": "GUAVA",
+          "description": "Guava 作为一级缓存（可选）."
+        }
+      ]
+    },
+    {
+      "name": "composite-cache.config.composite.l2-cache-type",
+      "values": [
+        {
+          "value": "REDIS",
+          "description": "Redis（Redisson）作为二级缓存."
+        }
+      ]
+    },
+    {
+      "name": "composite-cache.config.redis.load-strategy",
+      "values": [
+        {
+          "value": "NONE",
+          "description": "不加保护，直接回源."
+        },
+        {
+          "value": "LOCK",
+          "description": "分布式锁单飞，防缓存击穿."
+        },
+        {
+          "value": "LOGICAL_EXPIRE",
+          "description": "逻辑过期，永不阻塞、异步刷新."
+        }
+      ]
+    },
+    {
+      "name": "composite-cache.config.cache-sync-policy.msg-type",
+      "values": [
+        {
+          "value": "REDIS",
+          "description": "Redis Pub/Sub 同步（推荐，配合 enhanced 可靠版）."
+        },
+        {
+          "value": "KAFKA",
+          "description": "Kafka 同步."
+        }
+      ]
+    }
+  ]
+}

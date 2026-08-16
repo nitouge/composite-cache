@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Composite Cache 测试台</title>
+<!-- 说明：故意不引入 jQuery/外部 CDN，纯原生 fetch，保证本地离线也能直接打开测试 -->
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f6f9; color: #222; }
+  header { background: linear-gradient(90deg,#111827,#1f2937); color: #fff; padding: 14px 22px; display: flex; align-items: baseline; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  header .sub { color: #9ca3af; font-size: 12px; }
+  .tabs { display: flex; gap: 4px; background: #111827; padding: 0 12px; flex-wrap: wrap; }
+  .tabs button { background: transparent; color: #cbd5e1; border: none; padding: 11px 16px; cursor: pointer; font-size: 14px; border-bottom: 3px solid transparent; transition: .15s; }
+  .tabs button:hover { color: #fff; }
+  .tabs button.active { color: #fff; border-bottom-color: #3b82f6; }
+  .layout { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+  .panel { flex: 1; min-width: 0; }
+  .result { width: 46%; position: sticky; top: 16px; background: #0b1021; color: #d6e2ff; border-radius: 10px; padding: 0; min-height: 70vh; max-height: calc(100vh - 32px); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 6px 24px rgba(0,0,0,.18); }
+  .rhead { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #1e2746; color: #93c5fd; font-size: 13px; font-weight: 700; }
+  .rhead .tools { display: flex; gap: 6px; }
+  .tbtn { background: #1e2746; color: #cbd5e1; border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+  .tbtn:hover { background: #2a355f; color: #fff; }
+  #resultBody { padding: 12px 14px; overflow: auto; flex: 1; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+  .card h3 { margin: 0 0 4px; font-size: 15px; }
+  .card .desc { color: #6b7280; font-size: 12px; margin-bottom: 10px; line-height: 1.5; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  label { font-size: 12px; color: #374151; }
+  input, textarea { border: 1px solid #d1d5db; border-radius: 6px; padding: 7px 9px; font-size: 13px; font-family: inherit; }
+  input { width: 120px; }
+  input:focus, textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+  textarea { width: 100%; min-height: 64px; }
+  button.go { background: #3b82f6; color: #fff; border: none; border-radius: 6px; padding: 8px 14px; cursor: pointer; font-size: 13px; transition: .15s; }
+  button.go:hover { background: #2563eb; }
+  button.go:active { transform: translateY(1px); }
+  button.go.safe { background: #10b981; } button.go.safe:hover { background: #059669; }
+  button.danger { background: #ef4444; } button.danger:hover { background: #dc2626; }
+  .meth { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-right: 6px; color: #fff; }
+  .GET { background: #16a34a; } .POST { background: #2563eb; } .PUT { background: #d97706; } .DELETE { background: #dc2626; }
+  .result .line { color: #9bb4ff; font-size: 12px; word-break: break-all; margin-bottom: 4px; }
+  .result .status { font-weight: 700; }
+  .result pre { white-space: pre-wrap; word-break: break-all; font-size: 12.5px; line-height: 1.5; margin: 8px 0 0; }
+  .ok { color: #4ade80; } .err { color: #f87171; }
+  .lat { color: #fbbf24; } .cmp-faster { color: #4ade80; } .cmp-slower { color: #f59e0b; }
+  .loading { color: #93c5fd; } .loading::after { content: ""; animation: dots 1s steps(4,end) infinite; }
+  @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} 100%{content:""} }
+  .hint { font-size: 12px; color: #6b7280; margin: 4px 0 12px; line-height: 1.6; }
+  .hist-title { padding: 8px 14px 4px; color: #6b7a9c; font-size: 11px; border-top: 1px solid #1e2746; }
+  .history { padding: 0 8px 10px; overflow: auto; max-height: 26vh; }
+  .hist-item { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 11.5px; color: #aab8e0; }
+  .hist-item:hover { background: #141b35; color: #fff; }
+  .hist-item .hurl { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist-item .hmeta { color: #6b7a9c; }
+  .tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:10px; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0; margin-left:6px;}
+  /* 缓存监控面板 */
+  .dash-controls { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .dash-controls select { border:1px solid #d1d5db; border-radius:6px; padding:5px 7px; font-size:12px; }
+  .dash-status { font-size:12px; color:#6b7280; margin-left:auto; }
+  .metrics-grid { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+  .metric { flex:1; min-width:120px; background:#0b1021; color:#e5edff; border-radius:10px; padding:12px 14px; }
+  .metric .k { font-size:11px; color:#93c5fd; letter-spacing:.3px; }
+  .metric .v { font-size:22px; font-weight:700; margin-top:4px; }
+  .metric .v small { font-size:12px; color:#9ca3af; font-weight:400; }
+  table.dash { width:100%; border-collapse:collapse; font-size:12.5px; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  table.dash th, table.dash td { padding:8px 10px; text-align:right; border-bottom:1px solid #eef0f4; white-space:nowrap; }
+  table.dash th { background:#f3f4f6; color:#374151; font-weight:700; font-size:11.5px; }
+  table.dash th:first-child, table.dash td:first-child { text-align:left; }
+  table.dash td.name { font-weight:600; color:#111827; text-align:left; }
+  table.dash td.type { color:#6b7280; font-size:11px; text-align:left; }
+  table.dash tr:hover td { background:#f9fafb; }
+  .bar { position:relative; height:16px; width:118px; background:#eef0f4; border-radius:8px; overflow:hidden; display:inline-block; vertical-align:middle; }
+  .bar > i { position:absolute; left:0; top:0; bottom:0; border-radius:8px; }
+  .bar > span { position:relative; z-index:1; font-size:10.5px; color:#111827; padding-left:6px; line-height:16px; }
+  .hr-high > i { background:#86efac; } .hr-mid > i { background:#fde68a; } .hr-low > i { background:#fca5a5; }
+  .dash-empty { color:#6b7280; font-size:13px; padding:14px; background:#fff; border:1px dashed #d1d5db; border-radius:10px; }
+  .dash-err { color:#b91c1c; font-size:13px; padding:14px; background:#fef2f2; border:1px solid #fecaca; border-radius:10px; line-height:1.6; }
+  .act-cell { text-align:center; } .act-cell button { font-size:11px; padding:4px 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Composite Cache 测试台</h1>
+  <span class="sub">多级缓存（L1 Caffeine + L2 Redis）· 注解 / 编程式 / 批量级联 / 一致性 / 难题演示 / 监控</span>
+</header>
+<div class="tabs" id="tabs"></div>
+<div class="layout">
+  <div class="panel" id="panel"></div>
+  <div class="result">
+    <div class="rhead">
+      <span>📤 结果</span>
+      <span class="tools">
+        <button class="tbtn" id="copyBtn" title="复制返回 JSON">复制</button>
+        <button class="tbtn" id="clearHistBtn" title="清空历史">清空历史</button>
+      </span>
+    </div>
+    <div id="resultBody">
+      <div class="line">点击左侧按钮发起请求，结果显示在这里。</div>
+      <div class="hint" style="color:#7c89b8">提示：对同一个 GET 连续点两次，观察 <span class="lat">latency</span> 与返回里的 queryTime —— 第一次回源较慢，第二次走缓存极快（会自动与上次同请求对比）。</div>
+    </div>
+    <div class="hist-title">🕘 请求历史（点击可一键重发）</div>
+    <div id="history" class="history"></div>
+  </div>
+</div>
+
+<script>
+const resultBody = document.getElementById('resultBody');
+const historyEl = document.getElementById('history');
+let lastResponseText = '';
+const lastLatency = {};   // "METHOD URL" -> ms（用于本次/上次耗时对比）
+const history = [];        // {method,url,body,status,ms}
+
+function escapeHtml(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+
+function renderLoading(method, url) {
+  resultBody.innerHTML =
+    '<div class="line"><span class="meth ' + method + '">' + method + '</span>' + escapeHtml(url) + '</div>' +
+    '<div class="line loading">请求中</div>';
+}
+
+function show(method, url, status, ms, body, isErr) {
+  const statusClass = isErr || status >= 400 ? 'err' : 'ok';
+  let pretty;
+  try { pretty = JSON.stringify(typeof body === 'string' ? JSON.parse(body) : body, null, 2); }
+  catch (e) { pretty = String(body); }
+  lastResponseText = pretty;
+
+  // 与上次同请求的耗时对比
+  const key = method + ' ' + url;
+  const prev = lastLatency[key];
+  let cmp = '';
+  if (prev !== undefined && !isErr) {
+    const faster = Number(ms) < Number(prev);
+    cmp = ' · <span class="' + (faster ? 'cmp-faster' : 'cmp-slower') + '">上次 ' + prev + ' ms（' +
+          (faster ? '↓ 快了 ' + (prev - ms).toFixed(1) + ' ms，命中缓存' : '↑ 慢了 ' + (ms - prev).toFixed(1) + ' ms') + '）</span>';
+  }
+  if (!isErr) lastLatency[key] = Number(ms);
+
+  resultBody.innerHTML =
+    '<div class="line"><span class="meth ' + method + '">' + method + '</span>' + escapeHtml(url) + '</div>' +
+    '<div class="line">状态：<span class="status ' + statusClass + '">' + status + '</span> · ' +
+    '耗时：<span class="lat">' + ms + ' ms</span>' + cmp + '</div>' +
+    '<pre>' + escapeHtml(pretty) + '</pre>';
+
+  pushHistory({ method, url, body, status, ms });
+}
+
+function pushHistory(item) {
+  history.unshift(item);
+  if (history.length > 15) history.pop();
+  renderHistory();
+}
+function renderHistory() {
+  historyEl.innerHTML = '';
+  history.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    const sc = h.status >= 400 || h.status === 'ERROR' ? 'err' : 'ok';
+    div.innerHTML = '<span class="meth ' + h.method + '">' + h.method + '</span>' +
+                    '<span class="hurl">' + escapeHtml(h.url) + '</span>' +
+                    '<span class="hmeta"><span class="' + sc + '">' + h.status + '</span> · ' + h.ms + 'ms</span>';
+    div.title = '点击重发';
+    div.onclick = () => send(h.method, h.url, h.body);
+    historyEl.appendChild(div);
+  });
+}
+
+async function send(method, url, body) {
+  renderLoading(method, url);
+  const t0 = performance.now();
+  try {
+    const opts = { method, headers: {} };
+    if (body !== undefined && body !== null && body !== '') {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = typeof body === 'string' ? body : JSON.stringify(body);
+    }
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    const ms = (performance.now() - t0).toFixed(1);
+    show(method, url, res.status, ms, text, !res.ok);
+  } catch (e) {
+    const ms = (performance.now() - t0).toFixed(1);
+    show(method, url, 'ERROR', ms, String(e), true);
+  }
+}
+const val = id => document.getElementById(id).value.trim();
+
+document.getElementById('copyBtn').onclick = () => {
+  if (!lastResponseText) return;
+  navigator.clipboard && navigator.clipboard.writeText(lastResponseText);
+  const b = document.getElementById('copyBtn'); const old = b.textContent;
+  b.textContent = '已复制'; setTimeout(() => b.textContent = old, 1000);
+};
+document.getElementById('clearHistBtn').onclick = () => { history.length = 0; renderHistory(); };
+
+// ---- Tab definitions ----
+const tabs = [
+  { id: 'user', name: '用户（注解缓存）' },
+  { id: 'batch', name: '批量 / 级联（编程式）' },
+  { id: 'product', name: '商品' },
+  { id: 'consistency', name: '一致性' },
+  { id: 'demo', name: '缓存难题（演示）' },
+  { id: 'monitor', name: '监控' },
+];
+
+const panes = {
+  user: `
+    <div class="hint">@CacheAble / @CachePut / @CacheEvict 注解驱动的 L1+L2 多级缓存（cacheName=user）。</div>
+    <div class="card"><h3><span class="meth GET">GET</span>查询用户（缓存）</h3>
+      <div class="desc">/api/users/{id} —— 第一次回源 DB，第二次走缓存（连点两次看耗时对比）。</div>
+      <div class="row"><label>id</label><input id="u_id" value="1"/>
+      <button class="go" onclick="send('GET','/api/users/'+val('u_id'))">查询</button></div></div>
+    <div class="card"><h3><span class="meth GET">GET</span>查询全部 / 按用户名</h3>
+      <div class="row"><button class="go" onclick="send('GET','/api/users')">全部用户</button>
+      <label>username</label><input id="u_name" value="Alice"/>
+      <button class="go" onclick="send('GET','/api/users/username/'+encodeURIComponent(val('u_name')))">按用户名</button></div></div>
+    <div class="card"><h3><span class="meth POST">POST</span>创建用户（写缓存）</h3>
+      <div class="desc">/api/users</div>
+      <textarea id="u_create">{"username":"Frank","email":"frank@example.com","age":27,"address":"Nanjing"}</textarea>
+      <div class="row" style="margin-top:8px"><button class="go" onclick="send('POST','/api/users', val('u_create'))">创建</button></div></div>
+    <div class="card"><h3><span class="meth PUT">PUT</span>更新用户（@CachePut 更新缓存）</h3>
+      <div class="row"><label>id</label><input id="u_uid" value="1"/></div>
+      <textarea id="u_update" style="margin-top:8px">{"username":"Alice Updated","email":"alice@example.com","age":26,"address":"Beijing"}</textarea>
+      <div class="row" style="margin-top:8px"><button class="go" onclick="send('PUT','/api/users/'+val('u_uid'), val('u_update'))">更新</button></div></div>
+    <div class="card"><h3><span class="meth DELETE">DELETE</span>删除 / 清空缓存（@CacheEvict）</h3>
+      <div class="row"><label>id</label><input id="u_did" value="1"/>
+      <button class="go danger" onclick="send('DELETE','/api/users/'+val('u_did'))">删除用户</button>
+      <button class="go danger" onclick="send('DELETE','/api/users/cache/clear')">清空 user 缓存</button></div></div>
+    <div class="card"><h3><span class="meth POST">POST</span>批量查询 / 直接操作缓存 / 统计</h3>
+      <div class="row"><label>ids(JSON)</label><input id="u_ids" value="[1,2,3]" style="width:160px"/>
+      <button class="go" onclick="send('POST','/api/users/batch', val('u_ids'))">批量查询</button>
+      <button class="go" onclick="send('POST','/api/users/cache/batch-test', val('u_ids'))">batchGet 测试</button></div>
+      <div class="row" style="margin-top:8px"><label>id</label><input id="u_dcid" value="1"/>
+      <button class="go" onclick="send('GET','/api/users/cache/direct/'+val('u_dcid'))">直接读缓存</button>
+      <button class="go" onclick="send('GET','/api/users/cache/stats')">缓存统计</button></div></div>
+  `,
+  batch: `
+    <div class="hint">编程式 CacheTemplate 批量操作：一次查 L1→L2→仅对未命中回源→回填→空值防穿透，按顺序返回。</div>
+    <div class="card"><h3><span class="meth GET">GET</span>批量获取用户</h3>
+      <div class="desc">/api/batch-cache/users?ids=1,2,3（List）与 /users/map（Map）</div>
+      <div class="row"><label>ids</label><input id="b_ids" value="1,2,3" style="width:160px"/>
+      <button class="go" onclick="send('GET','/api/batch-cache/users?ids='+encodeURIComponent(val('b_ids')))">List</button>
+      <button class="go" onclick="send('GET','/api/batch-cache/users/map?ids='+encodeURIComponent(val('b_ids')))">Map</button>
+      <button class="go danger" onclick="send('DELETE','/api/batch-cache/users?ids='+encodeURIComponent(val('b_ids')))">批量删除</button></div></div>
+    <div class="card"><h3><span class="meth POST">POST</span>批量写缓存</h3>
+      <div class="desc">/api/batch-cache/users（List&lt;User&gt;）</div>
+      <textarea id="b_put">[{"id":1,"username":"U1","email":"u1@x.com","age":20,"address":"A"},{"id":2,"username":"U2","email":"u2@x.com","age":21,"address":"B"}]</textarea>
+      <div class="row" style="margin-top:8px"><button class="go" onclick="send('POST','/api/batch-cache/users', val('b_put'))">批量写入</button></div></div>
+    <div class="card"><h3><span class="meth GET">GET</span>级联加载 <span class="tag">N+1 对比</span></h3>
+      <div class="desc">✅ <b>安全DTO</b>：用 <code>batchGetOrLoadCombined</code> 组合出新对象，<b>不污染缓存</b>；
+        ⚠️ 其余三个旧端点通过 setter 把关联挂到<b>被缓存的</b> user/order 上（会污染 L1，仅作对比保留）。</div>
+      <div class="row"><label>ids</label><input id="b_ids2" value="1,2,3" style="width:160px"/></div>
+      <div class="row" style="margin-top:8px">
+      <button class="go safe" onclick="send('GET','/api/batch-cache/users-with-orders-vo?ids='+encodeURIComponent(val('b_ids2')))">✅ 用户+订单(安全DTO)</button>
+      <button class="go" onclick="send('GET','/api/batch-cache/users-with-orders?ids='+encodeURIComponent(val('b_ids2')))">用户+订单</button>
+      <button class="go" onclick="send('GET','/api/batch-cache/users-with-orders-products?ids='+encodeURIComponent(val('b_ids2')))">用户+订单+商品</button>
+      <button class="go" onclick="send('GET','/api/batch-cache/orders-with-products?ids='+encodeURIComponent(val('b_ids2')))">订单+商品</button></div></div>
+    <div class="card"><h3><span class="meth POST">POST</span>完整批量流程</h3>
+      <div class="desc">查询 → 改 → 批量写 → 校验命中 → 批量删（看后端日志）</div>
+      <div class="row"><label>ids</label><input id="b_ids3" value="1,2,3" style="width:160px"/>
+      <button class="go" onclick="send('POST','/api/batch-cache/complete-flow?ids='+encodeURIComponent(val('b_ids3')))">运行</button></div></div>
+  `,
+  product: `
+    <div class="hint">商品缓存（product: L1 60s / L2 5min）。先查两次看加速，再更新/删除看缓存同步。</div>
+    <div class="card"><h3><span class="meth GET">GET</span>查询商品（缓存 vs 不缓存）</h3>
+      <div class="row"><label>id</label><input id="p_id" value="1"/>
+      <button class="go" onclick="send('GET','/product/'+val('p_id'))">查询(缓存)</button>
+      <button class="go" onclick="send('GET','/product/'+val('p_id')+'/nocache')">查询(不缓存)</button></div></div>
+    <div class="card"><h3><span class="meth GET">GET</span>按分类查询（L1）</h3>
+      <div class="row"><label>category</label><input id="p_cat" value="手机" style="width:140px"/>
+      <button class="go" onclick="send('GET','/product/category/'+encodeURIComponent(val('p_cat')))">查询分类</button>
+      <button class="go" onclick="send('GET','/product/test-guide')">测试指南</button></div></div>
+    <div class="card"><h3><span class="meth PUT">PUT</span>更新价格 / 库存（同步缓存）</h3>
+      <div class="row"><label>id</label><input id="p_uid" value="1"/>
+      <label>price</label><input id="p_price" value="8999"/>
+      <button class="go" onclick="send('PUT','/product/'+val('p_uid')+'/price?price='+val('p_price'))">更新价格</button></div>
+      <div class="row" style="margin-top:8px"><label>stock</label><input id="p_stock" value="500"/>
+      <button class="go" onclick="send('PUT','/product/'+val('p_uid')+'/stock?stock='+val('p_stock'))">更新库存</button>
+      <button class="go danger" onclick="send('DELETE','/product/'+val('p_uid'))">删除商品</button></div></div>
+  `,
+  consistency: `
+    <div class="hint">一致性：逻辑过期/删除补偿/主从读。库存查询走 ProductionCacheService。</div>
+    <div class="card"><h3><span class="meth GET">GET</span>查询库存 / 预热</h3>
+      <div class="row"><label>productId</label><input id="c_pid" value="1"/>
+      <button class="go" onclick="send('GET','/consistency/stock/'+val('c_pid'))">查库存</button>
+      <button class="go" onclick="send('POST','/consistency/warmup/'+val('c_pid'))">预热</button></div></div>
+    <div class="card"><h3><span class="meth PUT">PUT</span>更新库存（先更新DB再删缓存）</h3>
+      <div class="row"><label>productId</label><input id="c_uid" value="1"/>
+      <label>quantity</label><input id="c_qty" value="100"/>
+      <button class="go" onclick="send('PUT','/consistency/stock/'+val('c_uid')+'?quantity='+val('c_qty'))">更新</button></div></div>
+    <div class="card"><h3><span class="meth GET">GET</span>一致性检查 / 修复</h3>
+      <div class="row"><label>productId</label><input id="c_cid" value="1"/>
+      <button class="go" onclick="send('GET','/consistency/check/'+val('c_cid'))">检查</button>
+      <button class="go" onclick="send('POST','/consistency/fix/'+val('c_cid'))">修复</button></div></div>
+    <div class="card"><h3><span class="meth GET">GET</span>删除补偿 / 并发测试</h3>
+      <div class="row"><button class="go" onclick="send('GET','/consistency/failed-count')">失败记录数</button>
+      <button class="go danger" onclick="send('POST','/consistency/clear-failed')">清空失败记录</button></div>
+      <div class="row" style="margin-top:8px"><label>productId</label><input id="c_tid" value="1"/>
+      <label>线程数</label><input id="c_threads" value="100"/>
+      <button class="go" onclick="send('GET','/consistency/concurrent-test/'+val('c_tid')+'?threadCount='+val('c_threads'))">并发查询（看击穿防护）</button></div></div>
+  `,
+  demo: `
+    <div class="hint">缓存四大难题「点一下看效果」：穿透 / 雪崩 / 布隆 / 降级（编程式 CacheTemplate，配可观测的回源计数）。
+      跑<b>本机 Redis（非 Docker）</b>；布隆与降级需 application.yml 已开启（本 demo 默认已开 <code>penetration.bloom-enabled</code> 与 <code>redis.degrade-enabled</code>）。</div>
+    <div class="card"><h3><span class="meth GET">GET</span>演示入口指引</h3>
+      <div class="desc">/demo —— 返回四类场景各自的玩法与预期结果。</div>
+      <div class="row"><button class="go" onclick="send('GET','/demo')">查看指引</button></div></div>
+    <div class="card"><h3>🕳️ 穿透 · NullValue 防穿透</h3>
+      <div class="desc">/demo/penetration/{id}?times=N —— 连查<b>不存在</b>的 id 多次，空结果被缓存为 NullValue，<b>只回源 1 次</b>（看返回 <code>dbCalls</code>，应为 1 而非 times）。</div>
+      <div class="row"><label>id</label><input id="d_pen_id" value="999999"/>
+      <label>times</label><input id="d_pen_times" value="5" style="width:80px"/>
+      <button class="go" onclick="send('GET','/demo/penetration/'+val('d_pen_id')+'?times='+encodeURIComponent(val('d_pen_times')))">查不存在的 id</button></div></div>
+    <div class="card"><h3>🌊 雪崩 · TTL 抖动打散</h3>
+      <div class="desc">/demo/avalanche?count=N —— 写 N 个同基础 TTL 的 key，实际 TTL 被随机抖动打散，避免集体同时过期（看 <code>distinctTtlCount</code> &gt; 1 与 <code>sampleTtlMs</code>）。</div>
+      <div class="row"><label>count</label><input id="d_ava_count" value="20"/>
+      <button class="go" onclick="send('GET','/demo/avalanche?count='+encodeURIComponent(val('d_ava_count')))">写入并看 TTL 分布</button></div></div>
+    <div class="card"><h3>🌸 布隆 · 回源前拦截「一定不存在」</h3>
+      <div class="desc">先预热合法 key，再查<b>未预热</b>的 id —— 被布隆判「一定不存在」拦在回源前（<code>dbCalls=0</code>、返回 null）。需 <code>bloom-enabled=true</code>。</div>
+      <div class="row"><label>预热 keys</label><input id="d_bloom_warm" value="1,2,3" style="width:160px"/>
+      <button class="go safe" onclick="send('POST','/demo/bloom/warmup?keys='+encodeURIComponent(val('d_bloom_warm')))">① 预热合法 key</button></div>
+      <div class="row" style="margin-top:8px"><label>查询 id</label><input id="d_bloom_id" value="999"/>
+      <button class="go" onclick="send('GET','/demo/bloom/'+val('d_bloom_id'))">② 查询（未预热应被拦，dbCalls=0）</button></div></div>
+    <div class="card"><h3>⛓️ 降级 · L2 运行期熔断</h3>
+      <div class="desc">/demo/degrade/status 看各缓存熔断态；停掉本机 Redis 后反复点 /demo/degrade/{id}，连续失败达阈值即 <b>OPEN</b>，读降级为 L1+回源、不再卡 Redis 超时；Redis 恢复后半开自愈。需 <code>degrade-enabled=true</code>。</div>
+      <div class="row"><button class="go" onclick="send('GET','/demo/degrade/status')">查熔断状态</button></div>
+      <div class="row" style="margin-top:8px"><label>id</label><input id="d_deg_id" value="1"/>
+      <button class="go" onclick="send('GET','/demo/degrade/'+val('d_deg_id'))">查询（停 Redis 后反复点观察 OPEN）</button></div></div>
+  `,
+  monitor: `
+    <div class="hint">缓存监控面板：实时读取 <code>/actuator/compositecache</code>（全局/各缓存命中率与概览），下方保留原始 Actuator/Prometheus 入口。</div>
+    <div class="card">
+      <h3>📊 缓存监控面板 <span class="tag">可自动刷新</span></h3>
+      <div class="desc">命中率需 <code>metrics.enabled=true</code> 且有访问量；若端点 404，多半是 test 应用未重启或未暴露 <code>compositecache</code>。表格「清空」即调 DELETE 端点。</div>
+      <div class="dash-controls">
+        <button class="go" onclick="loadCacheDash()">刷新</button>
+        <label><input type="checkbox" id="dashAuto" onchange="toggleDashAuto()"/> 自动刷新</label>
+        <label>间隔
+          <select id="dashInterval" onchange="toggleDashAuto()">
+            <option value="2000">2s</option><option value="3000" selected>3s</option>
+            <option value="5000">5s</option><option value="10000">10s</option>
+          </select></label>
+        <button class="go danger" onclick="dashClearAll()" title="DELETE /actuator/compositecache">清空所有缓存</button>
+        <span class="dash-status" id="dashStatus"></span>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <label>逐出 key</label>
+        <input id="dashEvCache" placeholder="cacheName" style="width:130px"/>
+        <input id="dashEvKey" placeholder="key" style="width:170px"/>
+        <button class="go danger" onclick="dashEvict()" title="POST /actuator/compositecache/{name} body {key}">逐出</button>
+      </div>
+      <div id="cacheDash"><div class="dash-empty">点击「刷新」加载…（或切到本标签会自动加载一次）</div></div>
+    </div>
+    <div class="card"><h3><span class="meth GET">GET</span>原始端点</h3>
+      <div class="row"><button class="go" onclick="send('GET','/actuator/health')">health</button>
+      <button class="go" onclick="send('GET','/actuator/metrics')">metrics 列表</button>
+      <button class="go" onclick="send('GET','/actuator/compositecache')">compositecache(原始 JSON)</button>
+      <button class="go" onclick="window.open('/actuator/prometheus','_blank')">打开 prometheus（新窗口）</button></div></div>
+    <div class="card"><h3><span class="meth GET">GET</span>单个指标</h3>
+      <div class="row"><label>name</label><input id="m_name" value="cache.hit" style="width:180px"/>
+      <button class="go" onclick="send('GET','/actuator/metrics/'+encodeURIComponent(val('m_name')))">查询</button></div>
+      <div class="hint">常用：cache.hit / cache.miss / cache.eviction / cache.latency / cache.load</div></div>
+  `,
+};
+
+// ---- 缓存监控面板 ----
+let dashTimer = null;
+
+async function loadCacheDash() {
+  const box = document.getElementById('cacheDash');
+  const statusEl = document.getElementById('dashStatus');
+  if (!box) return;
+  if (statusEl) statusEl.textContent = '加载中…';
+  try {
+    const res = await fetch('/actuator/compositecache');
+    if (res.status === 404) {
+      box.innerHTML = '<div class="dash-err">404：未找到 compositecache 端点。请确认已<b>重启 test 应用</b>，且 application.yml 的 <code>management.endpoints.web.exposure.include</code> 含 <code>compositecache</code>。</div>';
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+    if (!res.ok) {
+      box.innerHTML = '<div class="dash-err">HTTP ' + res.status + '</div>';
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+    renderCacheDash(await res.json());
+    if (statusEl) statusEl.textContent = '更新于 ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    box.innerHTML = '<div class="dash-err">请求失败：' + escapeHtml(String(e)) + '</div>';
+    if (statusEl) statusEl.textContent = '';
+  }
+}
+
+function hrClass(r) { return r >= 0.8 ? 'hr-high' : (r >= 0.5 ? 'hr-mid' : 'hr-low'); }
+function pct(r) { return (r * 100).toFixed(1) + '%'; }
+function bar(r) { return '<span class="bar ' + hrClass(r) + '"><i style="width:' + Math.round(r * 100) + '%"></i><span>' + pct(r) + '</span></span>'; }
+const numOr = (v) => (v != null ? v : '-');
+
+function renderCacheDash(data) {
+  const box = document.getElementById('cacheDash');
+  const caches = data.caches || {};
+  const names = Object.keys(caches);
+  let html = '';
+  const g = data.global;
+  if (g) {
+    html += '<div class="metrics-grid">' +
+      '<div class="metric"><div class="k">全局命中率</div><div class="v">' + pct(g.hitRate || 0) + '</div></div>' +
+      '<div class="metric"><div class="k">命中 / 未命中</div><div class="v">' + (g.totalHits || 0) + ' <small>/ ' + (g.totalMisses || 0) + '</small></div></div>' +
+      '<div class="metric"><div class="k">总请求</div><div class="v">' + (g.totalRequests || 0) + '</div></div>' +
+      '<div class="metric"><div class="k">缓存数</div><div class="v">' + (data.cacheCount != null ? data.cacheCount : names.length) + '</div></div>' +
+      '</div>';
+  }
+  if (names.length === 0) {
+    html += '<div class="dash-empty">暂无缓存（先到其它标签页调用接口产生缓存，再回来刷新）。' + (g ? '' : '未启用 metrics 或无 MeterRegistry，故无命中统计。') + '</div>';
+    box.innerHTML = html;
+    return;
+  }
+  html += '<table class="dash"><thead><tr>' +
+    '<th>缓存</th><th>类型</th><th>L1条目</th><th>命中</th><th>未命中</th><th>L1命中</th><th>L2命中</th><th>驱逐</th><th>命中率</th><th>操作</th>' +
+    '</tr></thead><tbody>';
+  names.sort().forEach(name => {
+    const c = caches[name] || {};
+    const s = c.stats || {};
+    const r = s.hitRate != null ? s.hitRate : 0;
+    html += '<tr>' +
+      '<td class="name">' + escapeHtml(name) + '</td>' +
+      '<td class="type">' + escapeHtml(c.type || '-') + '</td>' +
+      '<td>' + numOr(c.l1Size) + '</td>' +
+      '<td>' + numOr(s.hitCount) + '</td>' +
+      '<td>' + numOr(s.missCount) + '</td>' +
+      '<td>' + numOr(s.l1HitCount) + '</td>' +
+      '<td>' + numOr(s.l2HitCount) + '</td>' +
+      '<td>' + numOr(s.evictionCount) + '</td>' +
+      '<td>' + (s.hitCount != null ? bar(r) : '-') + '</td>' +
+      '<td class="act-cell"><button class="go danger" onclick="dashClear(\'' + encodeURIComponent(name) + '\')">清空</button></td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+}
+
+function toggleDashAuto() {
+  stopDashAuto();
+  const auto = document.getElementById('dashAuto');
+  if (auto && auto.checked) {
+    const sel = document.getElementById('dashInterval');
+    const iv = parseInt((sel && sel.value) || '3000', 10);
+    dashTimer = setInterval(loadCacheDash, iv);
+    loadCacheDash();
+  }
+}
+function stopDashAuto() { if (dashTimer) { clearInterval(dashTimer); dashTimer = null; } }
+
+async function dashClear(nameEnc) {
+  await send('DELETE', '/actuator/compositecache/' + nameEnc);
+  loadCacheDash();
+}
+async function dashClearAll() {
+  await send('DELETE', '/actuator/compositecache');
+  loadCacheDash();
+}
+async function dashEvict() {
+  const cache = ((document.getElementById('dashEvCache') || {}).value || '').trim();
+  const key = ((document.getElementById('dashEvKey') || {}).value || '').trim();
+  if (!cache || !key) { alert('请填写 cacheName 和 key'); return; }
+  await send('POST', '/actuator/compositecache/' + encodeURIComponent(cache), { key: key });
+  loadCacheDash();
+}
+
+// build tabs
+const tabBar = document.getElementById('tabs');
+const panel = document.getElementById('panel');
+tabs.forEach((t, i) => {
+  const b = document.createElement('button');
+  b.textContent = t.name; b.dataset.id = t.id;
+  if (i === 0) b.classList.add('active');
+  b.onclick = () => activate(t.id);
+  tabBar.appendChild(b);
+});
+function activate(id) {
+  stopDashAuto();
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+  panel.innerHTML = panes[id];
+  if (id === 'monitor') loadCacheDash();   // 进入监控页自动拉一次
+}
+activate('user');
+</script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+server:
+  port: 8000
+
+spring:
+  application:
+    name: composite-cache-test
+  
+  # 数据源配置
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/composite_cache_test?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: root@123456  # 请修改为你的MySQL密码
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+
+  # Redis 配置（Spring Data Redis）
+  redis:
+    host: localhost
+    port: 6379
+    password: admin@123456
+    database: 2
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+    # Redisson 配置（使用 RedissonConfig 类配置，不使用 YAML 文件）
+    # redisson:
+    #   file: classpath:redisson-single.yml    
+
+# Composite Cache Configuration
+composite-cache:
+  enabled: true
+  # Key 生成策略：DEFAULT / CUSTOM / SMART（仅在注解未配置 keyExpr 时作为回退）
+  key-generator-strategy: SMART
+
+  # 缓存监控（需 classpath 存在 MeterRegistry，即引入 actuator + micrometer registry 才会生效）
+  metrics:
+    enabled: true
+    report-interval: 15
+
+  # 核心配置
+  config:
+    # 注：instanceId 运行时会被自动设置为 ip:port（用于多实例缓存同步标识），此处无需配置
+    cache-mode: L1_L2          # L1 / L2 / L1_L2
+
+    # null值处理（防穿透）
+    allow-null-values: true
+    null-value-expire-time-seconds: 60
+    null-value-max-size: 1000
+    null-value-clear-period-seconds: 120
+
+    # 动态缓存（按 cacheName 动态创建）
+    dynamic: true
+
+    # 组合缓存类型
+    composite:
+      l1-cache-type: CAFFEINE   # CAFFEINE / GUAVA
+      l2-cache-type: REDIS      # REDIS
+
+    # Caffeine（L1）配置
+    caffeine:
+      manual-cache: false
+      auto-refresh-expire-cache: false
+      refresh-thread-pool-size: 4
+      refresh-period: 30
+      publish-msg-period-milli-seconds: 500
+
+    # Guava（L1）配置（仅当 l1-cache-type=GUAVA 时使用）
+    guava:
+      manual-cache: false
+      auto-refresh-expire-cache: false
+      refresh-thread-pool-size: 4
+      refresh-period: 30
+
+    # Redis（L2）配置
+    redis:
+      # L2 失效回源策略：NONE（不加保护）/ LOCK（本地锁+分布式锁）/ LOGICAL_EXPIRE（逻辑过期+异步刷新）
+      load-strategy: LOCK
+      try-lock: true            # LOCK 策略下：true=抢不到锁快速失败，false=阻塞等待
+      user-prefix: true         # L2 key 是否以 cacheName 作为前缀
+      support-batch: true       # 是否使用 pipeline 批量操作
+      batch-size: 50
+      logical-expire-physical-ttl-factor: 2   # LOGICAL_EXPIRE 下物理 TTL = 逻辑 TTL × 该倍数
+      ttl-jitter-ratio: 0.1     # 防雪崩：TTL 随机抖动比例（实际 TTL = base + rand(0, base*ratio)），0 关闭
+      # 运行期 L2 降级（熔断）：演示已开启（停掉 Redis 后反复访问 → 熔断 OPEN → 读降级/写跳过；恢复自愈）
+      degrade-enabled: true
+      degrade-failure-threshold: 3     # 演示用：连续 3 次失败即熔断（生产默认 5）
+      degrade-open-millis: 8000        # 熔断打开 8s 后进入半开试探
+
+    # 缓存同步策略（多实例 L1 同步）
+    cache-sync-policy:
+      msg-type: REDIS           # REDIS / KAFKA
+      topic: cache-sync-topic
+      async: true               # 是否异步发送同步消息
+      enhanced: true            # REDIS 默认用可靠版（版本门控+去重+失败补偿）；false 回退基础版
+
+    # 多级缓存一致性增强（按需开启；本测试项目的 ProductionCacheService 依赖
+    # delete-compensation / master-slave 这两个 Bean，故默认开启，否则应用启动会因缺少 Bean 失败）
+    # 注：coordinator / logical-expire 两项已随重复实现删除而移除（逻辑过期改用 redis.load-strategy=LOGICAL_EXPIRE）
+    consistency:
+      delayed-double-delete: true               # 延迟双删（接入 CompositeCache.evict）
+      delayed-double-delete-millis: 500
+      delete-compensation: true                 # 删除失败补偿（需 Redis）
+      delete-compensation-max-retry: 10
+      delete-compensation-interval-seconds: 60
+      master-slave: true                        # 注册 MasterSlaveConsistencyHandler（ProductionCacheService 依赖）
+
+    # 防穿透布隆过滤器：演示已开启（开启后仍需对每个 cacheName warmUp 全量合法 key 才生效）
+    penetration:
+      bloom-enabled: true
+      bloom-expected-insertions: 100000
+      bloom-fpp: 0.01
+
+# Actuator配置（监控端点）
+# composite-cache 为本框架的缓存管理端点：
+#   GET /actuator/compositecache、GET /actuator/compositecache/{name}
+#   POST /actuator/compositecache/{name} body {"key":"xxx"} 逐出 key
+#   DELETE /actuator/compositecache[/{name}] 清空全部/指定缓存
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,composite-cache
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# MyBatis Plus配置
+mybatis-plus:
+  configuration:
+    # 日志
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 驼峰命名转换
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      # 主键类型
+      id-type: auto
+      # 逻辑删除字段
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  # Mapper XML文件位置
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+logging:
+  level:
+    io.github.nitouge.cache: DEBUG
+    # 命中链路追踪（数据来自 L1/L2/回源）：专用 logger，只打 key 不打 value。
+    # 此处父级已 DEBUG 故已生效；想“只看链路”可把上面一行改成 INFO、仅保留下面这行。
+    io.github.nitouge.cache.access: DEBUG
+    io.github.nitouge.cache.test.mapper: DEBUG
+    root: INFO

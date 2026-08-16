@@ -1,0 +1,103 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.nitouge</groupId>
+        <artifactId>composite-cache</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>composite-cache-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <dependencies>
+        <!-- 核心依赖 -->
+        <dependency>
+            <groupId>io.github.nitouge</groupId>
+            <artifactId>composite-cache-annotation</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        
+        <!-- 配置处理器（生成配置提示） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Redis 客户端（必需）：框架的分布式锁/RTopic/RBatch/RQueue/布隆等基建均依赖 Redisson，
+             core 多个常加载类（CacheConfig/CompositeCacheManager 等）硬引用 Redisson 类型，
+             故 Redisson 为必需依赖（非 optional），避免接入方不引入时 NoClassDefFoundError。
+             "L1-only" 通过运行期 Redis 不可用降级（熔断）或显式 cacheMode=L1 达成，而非省去该依赖。
+             注：框架不使用 Spring Data Redis / RedisTemplate。 -->
+        <dependency>
+            <groupId>org.redisson</groupId>
+            <artifactId>redisson-spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- 监控支持（可选） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- 测试：用于自动配置上下文冒烟测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Maven Compiler Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                    <encoding>UTF-8</encoding>
+                    <annotationProcessorPaths>
+                        <!-- Lombok 注解处理器（须在配置处理器之前，先生成 getter/setter） -->
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>${lombok.version}</version>
+                        </path>
+                        <!-- Spring Boot 配置元数据处理器：扫描 @ConfigurationProperties 生成
+                             spring-configuration-metadata.json，并合并 additional-spring-configuration-metadata.json。
+                             注：显式声明 annotationProcessorPaths 后，仅此处列出的处理器会运行，故必须显式加入。 -->
+                        <path>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-configuration-processor</artifactId>
+                            <version>${spring-boot.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
