@@ -78,7 +78,7 @@ public @interface Cache_L2 {
      * 
      * <p>注意：L2的TTL应该大于L1的TTL，保证L1过期后可以从L2回填。
      * 
-     * @return 有效时间，默认86400秒（1天）
+     * @return 有效时间，默认300秒（5分钟）
      */
     long TTL() default 300L;
 

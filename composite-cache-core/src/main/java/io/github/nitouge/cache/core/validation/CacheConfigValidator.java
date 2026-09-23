@@ -238,11 +238,13 @@ public class CacheConfigValidator {
                 "Batch size should not exceed 1000 to avoid performance issues");
         }
 
-        // 验证逻辑过期物理 TTL 放大倍数（>=1，保证逻辑过期后旧值仍在）
-        if (config.getLogicalExpirePhysicalTtlFactor() < 1) {
+        // 验证逻辑过期物理 TTL 放大倍数
+        // 0: 不设置物理 TTL，完全依赖逻辑过期
+        // >= 1: 设置物理 TTL = 逻辑 TTL × factor，作为兜底保护
+        if (config.getLogicalExpirePhysicalTtlFactor() < 0) {
             throw CacheExceptionFactory.configError("redis.logicalExpirePhysicalTtlFactor",
-                config.getLogicalExpirePhysicalTtlFactor(),
-                "logicalExpirePhysicalTtlFactor must be >= 1");
+                    config.getLogicalExpirePhysicalTtlFactor(),
+                    "logicalExpirePhysicalTtlFactor must be >= 0");
         }
 
         // 验证 TTL 抖动比例（>=0，0 表示关闭；防雪崩）

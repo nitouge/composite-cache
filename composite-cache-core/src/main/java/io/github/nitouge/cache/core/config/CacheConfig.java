@@ -186,7 +186,13 @@ public class CacheConfig {
         private RedisLoadStrategyEnum loadStrategy;
 
         /**
-         * 逻辑过期模式下，物理 TTL 相对逻辑 TTL 的放大倍数（保证逻辑过期后旧值仍在、可被异步刷新）。
+         * 逻辑过期模式下，物理 TTL 相对逻辑 TTL 的放大倍数。
+         * <ul>
+         *   <li>如果 = 0：不设置物理 TTL（Redis key 永不过期），完全依赖逻辑过期机制</li>
+         *   <li>如果 >= 1：设置物理 TTL = 逻辑 TTL × 该倍数，作为兜底保护，防止异步刷新失败导致脏数据永久存在</li>
+         * </ul>
+         * <p>默认值为 2，即物理 TTL 是逻辑 TTL 的 2 倍，提供兜底保护。
+         * <p><b>注意</b>：使用逻辑过期策略时，必须配置正数的过期时间，否则会抛出异常。
          */
         private int logicalExpirePhysicalTtlFactor = 2;
 

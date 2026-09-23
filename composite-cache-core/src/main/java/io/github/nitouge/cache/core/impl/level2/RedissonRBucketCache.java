@@ -647,12 +647,15 @@ public class RedissonRBucketCache extends AbstractAdaptingCache implements L2Cac
         boolean setResult;
         if (isLogicalExpire()) {
             LogicalExpireWrapper wrapper = buildLogicalExpireWrapper(storeValue, expire.getKey(), expire.getValue());
-            if (expire.getKey() > 0) {
-                int factor = Math.max(1, redisConfig.getLogicalExpirePhysicalTtlFactor());
-                long physicalMs = expire.getKey() * factor;
-                setResult = bucket.setIfAbsent(wrapper, Duration.ofMillis(physicalMs));
-            } else {
+            int factor = redisConfig.getLogicalExpirePhysicalTtlFactor();
+            // factor = 0: 不设置物理 TTL
+            // factor >= 1: 设置物理 TTL = 逻辑 TTL × factor
+            if (factor == 0) {
                 setResult = bucket.setIfAbsent(wrapper);
+            } else {
+                long logicalMs = expire.getValue().toMillis(expire.getKey());
+                long physicalMs = logicalMs * factor;
+                setResult = bucket.setIfAbsent(wrapper, Duration.ofMillis(physicalMs));
             }
         } else if (expire.getKey() > 0) {
             setResult = bucket.setIfAbsent(storeValue, Duration.ofMillis(expire.getValue().toMillis(expire.getKey())));
@@ -724,8 +727,16 @@ public class RedissonRBucketCache extends AbstractAdaptingCache implements L2Cac
 
                 if (isLogicalExpire()) {
                     LogicalExpireWrapper wrapper = buildLogicalExpireWrapper(storeValue, expire.getKey(), expire.getValue());
-                    long physicalMs = expire.getKey() * Math.max(1, redisConfig.getLogicalExpirePhysicalTtlFactor());
-                    batch.getBucket(cacheKey).setAsync(wrapper, physicalMs, TimeUnit.MILLISECONDS);
+                    int factor = redisConfig.getLogicalExpirePhysicalTtlFactor();
+                    // factor = 0: 不设置物理 TTL
+                    // factor >= 1: 设置物理 TTL = 逻辑 TTL × factor
+                    if (factor == 0) {
+                        batch.getBucket(cacheKey).setAsync(wrapper);
+                    } else {
+                        long logicalMs = expire.getValue().toMillis(expire.getKey());
+                        long physicalMs = logicalMs * factor;
+                        batch.getBucket(cacheKey).setAsync(wrapper, physicalMs, TimeUnit.MILLISECONDS);
+                    }
                 } else if (expire.getKey() > 0) {
                     batch.getBucket(cacheKey).setAsync(storeValue, expire.getKey(), expire.getValue());
                 } else {
@@ -770,15 +781,19 @@ public class RedissonRBucketCache extends AbstractAdaptingCache implements L2Cac
     private void setBucketWithExpire(RBucket<Object> bucket, Object value, long expireTime, TimeUnit timeUnit) {
         if (isLogicalExpire()) {
             LogicalExpireWrapper wrapper = buildLogicalExpireWrapper(value, expireTime, timeUnit);
-            if (expireTime > 0) {
-                int factor = Math.max(1, redisConfig.getLogicalExpirePhysicalTtlFactor());
-                long physicalMs = expireTime * factor;
-                bucket.set(wrapper, Duration.ofMillis(physicalMs));
-                log.debug("put logical-expire, cacheName={}, logicalMs={}, physicalMs={}, key={}",
-                        getCacheName(), expireTime, physicalMs, bucket.getName());
-            } else {
+            int factor = redisConfig.getLogicalExpirePhysicalTtlFactor();
+            // 如果 factor = 0，不设置物理 TTL（永不过期）
+            if (factor == 0) {
                 bucket.set(wrapper);
-                log.debug("put logical-expire (no ttl), cacheName={}, key={}", getCacheName(), bucket.getName());
+                log.debug("put logical-expire (no physical ttl), cacheName={}, logicalExpireAt={}, key={}",
+                        getCacheName(), wrapper.getLogicalExpireAt(), bucket.getName());
+            } else {
+                // 设置物理 TTL = 逻辑 TTL × factor，作为兜底保护
+                long logicalMs = timeUnit.toMillis(expireTime);
+                long physicalMs = logicalMs * factor;
+                bucket.set(wrapper, Duration.ofMillis(physicalMs));
+                log.debug("put logical-expire, cacheName={}, logicalExpireAt={}, physicalMs={}, key={}",
+                        getCacheName(), wrapper.getLogicalExpireAt(), physicalMs, bucket.getName());
             }
         } else if (expireTime > 0) {
             bucket.set(value, Duration.ofMillis(timeUnit.toMillis(expireTime)));
@@ -791,11 +806,14 @@ public class RedissonRBucketCache extends AbstractAdaptingCache implements L2Cac
 
     /** 统一构建逻辑过期包装器 */
     private LogicalExpireWrapper buildLogicalExpireWrapper(Object value, long expireTime, TimeUnit timeUnit) {
-        if (expireTime > 0) {
-            long logicalMs = timeUnit.toMillis(expireTime);
-            return new LogicalExpireWrapper(value, System.currentTimeMillis() + logicalMs);
+        // 逻辑过期策略必须配置正数过期时间
+        if (expireTime <= 0) {
+            throw new IllegalStateException(
+                "Logical expire strategy requires positive expireTime, but got: " + expireTime +
+                ". Please configure a valid expire time for this cache.");
         }
-        return new LogicalExpireWrapper(value, Long.MAX_VALUE);
+        long logicalMs = timeUnit.toMillis(expireTime);
+        return new LogicalExpireWrapper(value, System.currentTimeMillis() + logicalMs);
     }
 
     /** 统一判断 valueLoader 是否有效（消除 4 处嵌套 instanceof） */

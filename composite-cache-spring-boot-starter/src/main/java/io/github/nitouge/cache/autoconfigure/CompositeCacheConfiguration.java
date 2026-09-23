@@ -6,15 +6,14 @@ import io.github.nitouge.cache.annotation.key.CacheKeyGenerator;
 import io.github.nitouge.cache.annotation.key.CacheKeyGeneratorFactory;
 import io.github.nitouge.cache.core.api.CacheManager;
 import io.github.nitouge.cache.core.api.CacheTemplate;
-import io.github.nitouge.cache.core.template.DefaultCacheTemplate;
 import io.github.nitouge.cache.core.config.CacheConfig;
 import io.github.nitouge.cache.core.consistency.CacheDeleteCompensation;
 import io.github.nitouge.cache.core.consistency.MasterSlaveConsistencyHandler;
 import io.github.nitouge.cache.core.consts.CacheConsts;
 import io.github.nitouge.cache.core.consts.enums.CacheModeEnum;
 import io.github.nitouge.cache.core.health.CacheHealthIndicator;
-import io.github.nitouge.cache.core.management.CompositeCacheManager;
 import io.github.nitouge.cache.core.management.CompositeCacheEndpoint;
+import io.github.nitouge.cache.core.management.CompositeCacheManager;
 import io.github.nitouge.cache.core.metrics.CacheMetrics;
 import io.github.nitouge.cache.core.metrics.CacheMetricsRecorder;
 import io.github.nitouge.cache.core.metrics.CacheStatisticsAggregator;
@@ -23,6 +22,7 @@ import io.github.nitouge.cache.core.metrics.LogStatisticsReporter;
 import io.github.nitouge.cache.core.metrics.NoOpCacheMetricsRecorder;
 import io.github.nitouge.cache.core.support.penetration.CacheBloomFilter;
 import io.github.nitouge.cache.core.support.penetration.GuavaCacheBloomFilter;
+import io.github.nitouge.cache.core.template.DefaultCacheTemplate;
 import io.github.nitouge.cache.core.util.RandomUtil;
 import io.github.nitouge.cache.core.validation.CacheConfigValidator;
 import io.github.nitouge.cache.prop.CompositeCacheProperties;
@@ -58,16 +58,18 @@ import java.util.concurrent.ScheduledExecutorService;
 
 @AutoConfiguration
 @EnableAspectJAutoProxy
-@AutoConfigureAfter({RedissonAutoConfiguration.class})
+@AutoConfigureAfter({
+        RedissonAutoConfiguration.class,
+        org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration.class,
+        org.springframework.boot.actuate.autoconfigure.metrics.export.prometheus.PrometheusMetricsExportAutoConfiguration.class
+})
 @EnableConfigurationProperties(CompositeCacheProperties.class)
-@ConditionalOnProperty(prefix = "composite-cache",  name = "enabled" , havingValue = "true")
+@ConditionalOnProperty(prefix = "composite-cache", name = "enabled", havingValue = "true")
 @Slf4j
 @RequiredArgsConstructor
 public class CompositeCacheConfiguration {
 
     private final CompositeCacheProperties properties;
-
-    private final Environment environment;
 
     /**
      * 自定义缓存配置
@@ -75,16 +77,15 @@ public class CompositeCacheConfiguration {
     @Bean
     @ConditionalOnMissingBean(CacheConfig.class)
     public CacheConfig cacheConfig(
-            CompositeCacheProperties properties,
             Environment environment,
             @Autowired(required = false) RedissonClient redissonClient) {
-        
+
         // 如果没有配置，创建默认配置
         CacheConfig config = properties.getConfig();
         if (config == null) {
             config = new CacheConfig();
         }
-        
+
         // 设置实例ID（= msgSrc，用于过滤本实例自身广播的缓存同步消息，必须全局唯一）
         try {
             String ip = InetAddress.getLocalHost().getHostAddress();
@@ -103,7 +104,7 @@ public class CompositeCacheConfiguration {
             // 解析本机 IP 失败时，保留 CacheConfig 构造期生成的唯一默认 instanceId（prefix + UUID），不覆写
             log.warn("Failed to resolve instanceId from host/port, keep default unique instanceId", e);
         }
-        
+
         // 没有 RedissonClient 则自动降级为 L1：L2 由 Redisson 实现，必须存在 RedissonClient
         // （此前误把 RedisTemplate 也算作"有 Redis"，会导致只有 RedisTemplate 时不降级、但 L2 又建不出 → NPE）
         if (redissonClient == null) {
@@ -113,23 +114,23 @@ public class CompositeCacheConfiguration {
                 config.setCacheMode(CacheModeEnum.L1);
             }
         }
-        
+
         // 验证配置
         CacheConfigValidator.validate(config);
         log.info("Cache configuration validated successfully");
-        
+
         return config;
     }
 
     /**
      * 定义 CacheManager - 统一创建方式
-     * 
+     *
      * <p>说明：
      * <ul>
      *   <li>存在 RedissonClient → L1 + L2（L2 基于 Redisson 实现）</li>
      *   <li>无 RedissonClient → 仅 L1</li>
      * </ul>
-     * 
+     *
      * <p>注意：使用 @Autowired(required = false) 来避免 Bean 初始化顺序问题
      */
     @Bean
@@ -190,7 +191,7 @@ public class CompositeCacheConfiguration {
         log.info("Enabling CompositeAspect for @CacheAble, @CachePut, @CacheEvict, @Caches");
         return new CompositeAspect();
     }
-    
+
     /**
      * 批量缓存切面
      */
@@ -200,7 +201,7 @@ public class CompositeCacheConfiguration {
         log.info("Enabling BatchCacheAspect for @BatchCacheAble");
         return new BatchCacheAspect();
     }
-    
+
     /**
      * 缓存Key生成器（默认使用CUSTOM策略）
      */
@@ -211,7 +212,7 @@ public class CompositeCacheConfiguration {
         if (strategy == null) {
             strategy = "CUSTOM";
         }
-        
+
         CacheKeyGenerator generator;
         switch (strategy.toUpperCase()) {
             case "DEFAULT":
@@ -228,7 +229,7 @@ public class CompositeCacheConfiguration {
                 log.info("Using CUSTOM CacheKeyGenerator");
                 break;
         }
-        
+
         return generator;
     }
 
@@ -312,7 +313,7 @@ public class CompositeCacheConfiguration {
     public CompositeCacheEndpoint compositeCacheEndpoint(
             CacheManager cacheManager,
             ObjectProvider<CacheStatisticsAggregator> aggregatorProvider) {
-        log.info("Enabling composite-cache actuator endpoint (id=composite-cache)");
+        log.info("Enabling composite cache actuator endpoint (id=compositecache)");
         return new CompositeCacheEndpoint(cacheManager, aggregatorProvider.getIfAvailable());
     }
 

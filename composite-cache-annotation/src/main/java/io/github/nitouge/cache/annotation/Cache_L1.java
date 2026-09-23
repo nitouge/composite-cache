@@ -93,9 +93,9 @@ public @interface Cache_L1 {
      *   <li>冷数据 - 3600-7200 秒（1-2 小时）</li>
      * </ul>
      *
-     * @return 有效时间，默认 300 秒（5 分钟）
+     * @return 有效时间，默认60秒（1分钟）
      */
-    int TTL() default 300;
+    int TTL() default 60;
 
     /**
      * 缓存时间单位

@@ -18,18 +18,18 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * 组合多级缓存的 Actuator 管理端点（id = {@code composite-cache}）。
+ * 组合多级缓存的 Actuator 管理端点（id = {@code compositecache}）。
  *
  * <p>opt-in：仅在引入 Spring Boot Actuator 且<b>显式暴露</b>后生效，例如：
- * <pre>management.endpoints.web.exposure.include=composite-cache</pre>
+ * <pre>management.endpoints.web.exposure.include=compositecache</pre>
  *
  * <h3>提供的操作</h3>
  * <ul>
- *   <li>{@code GET    /actuator/composite-cache}        —— 全局命中率 + 各缓存概览（类型/L1 条目数/命中统计）</li>
- *   <li>{@code GET    /actuator/composite-cache/{name}} —— 单个缓存详情</li>
- *   <li>{@code POST   /actuator/composite-cache/{name}} —— 请求体 {@code {"key":"xxx"}} 逐出指定 key</li>
- *   <li>{@code DELETE /actuator/composite-cache}        —— 清空所有缓存</li>
- *   <li>{@code DELETE /actuator/composite-cache/{name}} —— 清空指定缓存</li>
+ *   <li>{@code GET    /actuator/compositecache}        —— 全局命中率 + 各缓存概览（类型/L1 条目数/命中统计）</li>
+ *   <li>{@code GET    /actuator/compositecache/{name}} —— 单个缓存详情</li>
+ *   <li>{@code POST   /actuator/compositecache/{name}} —— 请求体 {@code {"key":"xxx"}} 逐出指定 key</li>
+ *   <li>{@code DELETE /actuator/compositecache}        —— 清空所有缓存</li>
+ *   <li>{@code DELETE /actuator/compositecache/{name}} —— 清空指定缓存</li>
  * </ul>
  *
  * <p>命中统计来自可选的 {@link CacheStatisticsAggregator}（未启用 metrics 时为 {@code null}，
@@ -43,7 +43,7 @@ import java.util.TreeMap;
  *
  */
 @Slf4j
-@Endpoint(id = "composite-cache")
+@Endpoint(id = "compositecache")
 public class CompositeCacheEndpoint {
 
     private final CacheManager cacheManager;

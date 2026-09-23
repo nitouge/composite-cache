@@ -112,7 +112,7 @@ composite-cache:
     # delete-compensation / master-slave 这两个 Bean，故默认开启，否则应用启动会因缺少 Bean 失败）
     # 注：coordinator / logical-expire 两项已随重复实现删除而移除（逻辑过期改用 redis.load-strategy=LOGICAL_EXPIRE）
     consistency:
-      delayed-double-delete: true               # 延迟双删（接入 CompositeCache.evict）
+      delayed-double-delete: false               # 延迟双删（接入 CompositeCache.evict）
       delayed-double-delete-millis: 500
       delete-compensation: true                 # 删除失败补偿（需 Redis）
       delete-compensation-max-retry: 10
@@ -126,7 +126,7 @@ composite-cache:
       bloom-fpp: 0.01
 
 # Actuator配置（监控端点）
-# composite-cache 为本框架的缓存管理端点：
+# compositecache 为本框架的缓存管理端点：
 #   GET /actuator/compositecache、GET /actuator/compositecache/{name}
 #   POST /actuator/compositecache/{name} body {"key":"xxx"} 逐出 key
 #   DELETE /actuator/compositecache[/{name}] 清空全部/指定缓存
@@ -134,7 +134,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,prometheus,composite-cache
+        include: health,metrics,prometheus,compositecache
   metrics:
     export:
       prometheus:
