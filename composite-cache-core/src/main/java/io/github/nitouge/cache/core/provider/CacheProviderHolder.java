@@ -112,6 +112,14 @@ public class CacheProviderHolder {
     /**
      * 按缓存模式创建缓存实例：优先取 {@link CacheSetting} 上指定的模式，未指定则回退全局 cacheMode。
      *
+     * <p>当注解配置的 cacheMode 与全局配置文件的 cache-mode 不一致时：
+     * <ul>
+     *   <li>注解要求 L1，但全局只初始化了 L2 -> 降级为 L2 only（L1 不可用）</li>
+     *   <li>注解要求 L2，但全局只初始化了 L1 -> 降级为 L1 only（L2 不可用）</li>
+     *   <li>注解要求 L1_L2，但全局只初始化了 L1 -> 降级为 L1 only</li>
+     *   <li>注解要求 L1_L2，但全局只初始化了 L2 -> 降级为 L2 only</li>
+     * </ul>
+     *
      * @param cacheName    缓存名，不可为空
      * @param cacheSetting 该缓存的独立设置，不可为 null
      * @return 对应模式的缓存（L1 / L2 / 组合缓存）
@@ -125,9 +133,10 @@ public class CacheProviderHolder {
             throw new IllegalArgumentException("缓存配置不能为null");
         }
 
-        CacheModeEnum cacheModeEnum = determineCacheMode(cacheSetting);
+        CacheModeEnum requestedMode = determineCacheMode(cacheSetting);
+        CacheModeEnum effectiveMode = validateAndAdjustCacheMode(cacheName, requestedMode);
 
-        switch (cacheModeEnum) {
+        switch (effectiveMode) {
             case L1:
                 return getL1Cache(cacheName, cacheSetting);
             case L2:
@@ -143,6 +152,58 @@ public class CacheProviderHolder {
             return cacheModeEnum;
         }
         return cacheConfig.getCacheMode();
+    }
+
+    /**
+     * 根据可用的缓存提供者校验并调整缓存模式。
+     *
+     * @param cacheName     缓存名称，用于日志记录
+     * @param requestedMode 注解或配置中请求的缓存模式
+     * @return 经过校验和调整后的实际生效模式
+     */
+    private CacheModeEnum validateAndAdjustCacheMode(String cacheName, CacheModeEnum requestedMode) {
+        boolean hasL1 = l1CacheProvider != null;
+        boolean hasL2 = l2CacheProvider != null;
+
+        // 如果请求的模式与可用提供者匹配，则无需调整
+        if (requestedMode == CacheModeEnum.L1 && hasL1) {
+            return CacheModeEnum.L1;
+        }
+        if (requestedMode == CacheModeEnum.L2 && hasL2) {
+            return CacheModeEnum.L2;
+        }
+        if (requestedMode == CacheModeEnum.L1_L2 && hasL1 && hasL2) {
+            return CacheModeEnum.L1_L2;
+        }
+
+        // 需要调整 - 记录警告日志并进行降级处理
+        if (requestedMode == CacheModeEnum.L1 && !hasL1) {
+            log.warn("Cache mode conflict: cacheName={}, requested=L1, but L1 provider not initialized (global config={}). Degrading to L2.",
+                    cacheName, cacheConfig.getCacheMode());
+            return CacheModeEnum.L2;
+        }
+        if (requestedMode == CacheModeEnum.L2 && !hasL2) {
+            log.warn("Cache mode conflict: cacheName={}, requested=L2, but L2 provider not initialized (global config={}). Degrading to L1.",
+                    cacheName, cacheConfig.getCacheMode());
+            return CacheModeEnum.L1;
+        }
+        if (requestedMode == CacheModeEnum.L1_L2) {
+            if (!hasL1 && hasL2) {
+                log.warn("Cache mode conflict: cacheName={}, requested=L1_L2, but L1 provider not initialized (global config={}). Degrading to L2.",
+                        cacheName, cacheConfig.getCacheMode());
+                return CacheModeEnum.L2;
+            }
+            if (hasL1 && !hasL2) {
+                log.warn("Cache mode conflict: cacheName={}, requested=L1_L2, but L2 provider not initialized (global config={}). Degrading to L1.",
+                        cacheName, cacheConfig.getCacheMode());
+                return CacheModeEnum.L1;
+            }
+        }
+
+        // 正常情况下不应执行到此处
+        throw new IllegalStateException(String.format(
+                "Invalid cache mode configuration: cacheName=%s, requested=%s, hasL1=%s, hasL2=%s",
+                cacheName, requestedMode, hasL1, hasL2));
     }
 
     /**

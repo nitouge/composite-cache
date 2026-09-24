@@ -328,9 +328,20 @@ public class BatchCacheAspect extends AbstractCacheAspect {
         Cache_L2 l2 = annotation.cacheL2();
         if (l2 != null) {
             L2CacheSetting l2Setting = new L2CacheSetting();
-            l2Setting.setExpireTime((long) l2.TTL());
+            l2Setting.setExpireTime(l2.TTL());
             l2Setting.setExpireTimeUnit(l2.timeUnit());
             l2Setting.setDataType(l2.dataType());
+
+            // 从注解读取回源策略配置
+            if (l2.loadStrategy() != null && !l2.loadStrategy().needResolve()) {
+                l2Setting.setLoadStrategy(l2.loadStrategy());
+            }
+
+            // 从注解读取逻辑过期物理TTL倍数
+            if (l2.logicalExpirePhysicalTtlFactor() >= 0) {
+                l2Setting.setLogicalExpirePhysicalTtlFactor(l2.logicalExpirePhysicalTtlFactor());
+            }
+
             setting.setL2CacheSetting(l2Setting);
         }
         

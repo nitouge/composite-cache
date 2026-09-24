@@ -110,7 +110,6 @@ composite-cache:
 
     # 多级缓存一致性增强（按需开启；本测试项目的 ProductionCacheService 依赖
     # delete-compensation / master-slave 这两个 Bean，故默认开启，否则应用启动会因缺少 Bean 失败）
-    # 注：coordinator / logical-expire 两项已随重复实现删除而移除（逻辑过期改用 redis.load-strategy=LOGICAL_EXPIRE）
     consistency:
       delayed-double-delete: false               # 延迟双删（接入 CompositeCache.evict）
       delayed-double-delete-millis: 500

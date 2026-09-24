@@ -473,11 +473,13 @@ public class CompositeAspect extends AbstractCacheAspect {
      * <p>配置优先级：
      * <ol>
      *   <li>优先使用注解中的 cacheMode 配置</li>
-     *   <li>如果未配置 cacheMode，根据 cacheL1 和 cacheL2 的配置推断</li>
+     *   <li>如果未配置 cacheMode，根据 Cache_L1 和 Cache_L2 的配置推断</li>
      *   <li>如果都未配置，使用默认 L1_L2 模式</li>
      * </ol>
-     * 
-     * @param annotation CacheAble 注解
+     *
+     * @param cacheMode 缓存模式
+     * @param l1        L1 配置（可为 null，使用默认）
+     * @param l2        L2 配置（可为 null，使用默认）
      * @return CacheSetting 配置对象
      */
     private CacheSetting buildCacheSetting(CacheModeEnum cacheMode, Cache_L1 l1, Cache_L2 l2) {
@@ -500,8 +502,19 @@ public class CompositeAspect extends AbstractCacheAspect {
         boolean hasL2Config = l2 != null;
         if (hasL2Config) {
             L2CacheSetting l2Setting = new L2CacheSetting();
-            l2Setting.setExpireTime((long) l2.TTL());
+            l2Setting.setExpireTime(l2.TTL());
             l2Setting.setExpireTimeUnit(l2.timeUnit());
+
+            // 从注解读取回源策略配置
+            if (l2.loadStrategy() != null && !l2.loadStrategy().needResolve()) {
+                l2Setting.setLoadStrategy(l2.loadStrategy());
+            }
+
+            // 从注解读取逻辑过期物理TTL倍数
+            if (l2.logicalExpirePhysicalTtlFactor() >= 0) {
+                l2Setting.setLogicalExpirePhysicalTtlFactor(l2.logicalExpirePhysicalTtlFactor());
+            }
+
             setting.setL2CacheSetting(l2Setting);
         }
 

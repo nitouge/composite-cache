@@ -143,13 +143,31 @@ public class AnnotationConfigValidator {
      * 验证 L2 配置
      */
     private static void validateL2Config(Cache_L2 config, String annotationType, String methodSignature) {
-        if (config.TTL() < 0) {
+        // TTL 验证：
+        // > 0: 正常过期时间
+        // -1: 永不过期（所有策略都支持）
+        // <= -2: 非法值
+        if (config.TTL() < -1) {
             throw AnnotationExceptionFactory.invalidConfig(
-                annotationType, 
-                methodSignature, 
-                "L2.TTL", 
-                config.TTL(), 
-                "TTL cannot be negative"
+                annotationType,
+                methodSignature,
+                "L2.TTL",
+                config.TTL(),
+                "TTL must be > 0 or -1 (where -1 means never expire)"
+            );
+        }
+
+        // 验证逻辑过期物理 TTL 倍数
+        // -1: 使用全局配置（默认）
+        // 0: 不设置物理 TTL
+        // >= 1: 设置物理 TTL = 逻辑 TTL × factor
+        if (config.logicalExpirePhysicalTtlFactor() < -1) {
+            throw AnnotationExceptionFactory.invalidConfig(
+                annotationType,
+                methodSignature,
+                "L2.logicalExpirePhysicalTtlFactor",
+                config.logicalExpirePhysicalTtlFactor(),
+                "logicalExpirePhysicalTtlFactor must be >= -1 (-1=use global config, 0=no physical TTL, >=1=factor)"
             );
         }
     }

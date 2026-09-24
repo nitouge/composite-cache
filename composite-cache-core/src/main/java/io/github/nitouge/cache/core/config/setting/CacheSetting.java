@@ -39,13 +39,13 @@ public class CacheSetting implements Serializable {
         L1CacheSetting l1 = new L1CacheSetting();
         l1.setInitialCapacity(100);
         l1.setMaximumSize(1000);
-        l1.setExpireTime(120L);
+        l1.setExpireTime(60L);
         l1.setExpireTimeUnit(TimeUnit.SECONDS);
 
         L2CacheSetting l2 = new L2CacheSetting();
         l2.setExpireTime(300L);
         l2.setExpireTimeUnit(TimeUnit.SECONDS);
 
-        return new CacheSetting(null, l1, l2);
+        return new CacheSetting(CacheModeEnum.L1_L2, l1, l2);
     }
 }

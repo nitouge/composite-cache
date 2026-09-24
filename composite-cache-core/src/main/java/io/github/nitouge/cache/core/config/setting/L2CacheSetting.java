@@ -1,6 +1,7 @@
 package io.github.nitouge.cache.core.config.setting;
 
 import io.github.nitouge.cache.core.consts.enums.CacheDataTypeEnum;
+import io.github.nitouge.cache.core.consts.enums.RedisLoadStrategyEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -34,5 +35,22 @@ public class L2CacheSetting {
      * {@link #expireTime} 的时间单位，默认秒。
      */
     private TimeUnit expireTimeUnit = TimeUnit.SECONDS;
+
+    /**
+     * Redis 回源策略（注解级别配置）。
+     *
+     * <p>为 null 或 AUTO 时，使用 CacheName 级别或全局配置。
+     * <p>优先级：注解显式指定 > CacheName 配置 > 全局配置。
+     */
+    private RedisLoadStrategyEnum loadStrategy;
+
+    /**
+     * 逻辑过期物理 TTL 倍数（注解级别配置）。
+     *
+     * <p>为 null 或 < 0 时，使用全局配置。
+     * <p>0: 不设置物理 TTL
+     * <p>>= 1: 物理 TTL = 逻辑 TTL × 该倍数
+     */
+    private Integer logicalExpirePhysicalTtlFactor;
 
 }

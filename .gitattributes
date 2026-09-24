@@ -1,0 +1,5 @@
+# 排除测试资源和文档不参与 GitHub 语言统计
+composite-cache-test/src/main/resources/static/* linguist-vendored
+composite-cache-test/target/* linguist-vendored
+temp/* linguist-documentation
+*.md linguist-documentation

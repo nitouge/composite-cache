@@ -207,10 +207,20 @@ const tabs = [
 const panes = {
   user: `
     <div class="hint">@CacheAble / @CachePut / @CacheEvict 注解驱动的 L1+L2 多级缓存（cacheName=user）。</div>
-    <div class="card"><h3><span class="meth GET">GET</span>查询用户（缓存）</h3>
+    <div class="card"><h3><span class="meth GET">GET</span>查询用户（缓存） <span class="tag">策略对比</span></h3>
       <div class="desc">/api/users/{id} —— 第一次回源 DB，第二次走缓存（连点两次看耗时对比）。</div>
       <div class="row"><label>id</label><input id="u_id" value="1"/>
-      <button class="go" onclick="send('GET','/api/users/'+val('u_id'))">查询</button></div></div>
+      <button class="go" onclick="send('GET','/api/users/'+val('u_id'))">默认策略查询</button></div>
+      <div class="desc" style="margin-top:10px"><b>策略对比测试</b>：三种不同的回源策略，可对比性能与行为差异。</div>
+      <div class="row" style="margin-top:8px">
+      <button class="go" onclick="send('GET','/api/users/hot/'+val('u_id'))" style="background:#10b981" onmouseover="this.style.background='#059669'" onmouseout="this.style.background='#10b981'">热点数据(逻辑过期+无物理TTL)</button>
+      <button class="go" onclick="send('GET','/api/users/warm/'+val('u_id'))" style="background:#f59e0b" onmouseover="this.style.background='#d97706'" onmouseout="this.style.background='#f59e0b'">普通热点(逻辑过期+TTL兜底)</button>
+      <button class="go" onclick="send('GET','/api/users/normal/'+val('u_id'))">普通数据(分布式锁)</button></div>
+      <div class="hint" style="margin-top:6px; font-size:11px">
+        🔥 <b>热点数据</b>: LOGICAL_EXPIRE策略，Redis key永不过期，适合核心高并发场景<br/>
+        ⚡ <b>普通热点</b>: LOGICAL_EXPIRE + 物理TTL兜底(3倍)，防止异步刷新失败<br/>
+        🔒 <b>普通数据</b>: LOCK策略，分布式锁防击穿，适合非热点场景
+      </div></div>
     <div class="card"><h3><span class="meth GET">GET</span>查询全部 / 按用户名</h3>
       <div class="row"><button class="go" onclick="send('GET','/api/users')">全部用户</button>
       <label>username</label><input id="u_name" value="Alice"/>

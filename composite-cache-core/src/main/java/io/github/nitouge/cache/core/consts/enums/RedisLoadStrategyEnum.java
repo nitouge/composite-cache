@@ -9,6 +9,13 @@ package io.github.nitouge.cache.core.consts.enums;
 public enum RedisLoadStrategyEnum {
 
     /**
+     * 自动模式：使用配置文件中的策略。
+     * <p>用于注解级别配置，表示不在注解中显式指定策略，而是使用 CacheName 级别或全局配置。
+     * <p>优先级：注解显式指定 > CacheName 配置 > 全局配置。
+     */
+    AUTO,
+
+    /**
      * 不加保护：未命中直接回源加载并写回。
      * <p>性能最好，但集群高并发下同一 key 可能有多次回源（缓存击穿）。
      * <p>注：本地 L1 若为 LoadingCache，仍提供单机维度的单飞保护。
@@ -27,5 +34,14 @@ public enum RedisLoadStrategyEnum {
      * <p>读到逻辑过期的值时返回旧值并异步刷新，保证"永不阻塞、永不击穿"，
      * 代价是可能短暂读到旧数据。适合高并发读、可容忍短暂不一致的热点场景。
      */
-    LOGICAL_EXPIRE
+    LOGICAL_EXPIRE;
+
+    /**
+     * 判断是否需要从配置中解析实际策略。
+     *
+     * @return true 表示需要解析（AUTO 模式）
+     */
+    public boolean needResolve() {
+        return this == AUTO;
+    }
 }

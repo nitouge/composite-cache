@@ -34,18 +34,75 @@ public class UserController {
     private CacheManager cacheManager;
 
     /**
-     * 根据ID查询用户
+     * 根据ID查询用户（默认策略）
      */
     @GetMapping("/{id}")
     public Map<String, Object> getUserById(@PathVariable Long id) {
         long startTime = System.currentTimeMillis();
         User user = userService.getUserById(id);
         long endTime = System.currentTimeMillis();
-        
+
         Map<String, Object> result = new HashMap<>();
         result.put("data", user);
         result.put("queryTime", endTime - startTime + "ms");
+        result.put("strategy", "默认策略（配置文件）");
         result.put("message", "第一次查询会较慢，后续查询会从缓存获取");
+        return result;
+    }
+
+    /**
+     * 查询热点用户（逻辑过期策略 + 无物理TTL）
+     */
+    @GetMapping("/hot/{id}")
+    public Map<String, Object> getHotUser(@PathVariable Long id) {
+        long startTime = System.currentTimeMillis();
+        User user = userService.getHotUser(id);
+        long endTime = System.currentTimeMillis();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("data", user);
+        result.put("queryTime", endTime - startTime + "ms");
+        result.put("strategy", "LOGICAL_EXPIRE");
+        result.put("physicalTtlFactor", 0);
+        result.put("cacheName", "hotUser");
+        result.put("message", "核心热点数据，Redis key永不过期，适合高并发场景");
+        return result;
+    }
+
+    /**
+     * 查询普通热点用户（逻辑过期策略 + 物理TTL兜底）
+     */
+    @GetMapping("/warm/{id}")
+    public Map<String, Object> getWarmUser(@PathVariable Long id) {
+        long startTime = System.currentTimeMillis();
+        User user = userService.getWarmUser(id);
+        long endTime = System.currentTimeMillis();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("data", user);
+        result.put("queryTime", endTime - startTime + "ms");
+        result.put("strategy", "LOGICAL_EXPIRE");
+        result.put("physicalTtlFactor", 3);
+        result.put("cacheName", "warmUser");
+        result.put("message", "普通热点数据，逻辑过期+物理TTL兜底(3倍)，防止异步刷新失败");
+        return result;
+    }
+
+    /**
+     * 查询普通用户（分布式锁策略）
+     */
+    @GetMapping("/normal/{id}")
+    public Map<String, Object> getNormalUser(@PathVariable Long id) {
+        long startTime = System.currentTimeMillis();
+        User user = userService.getNormalUser(id);
+        long endTime = System.currentTimeMillis();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("data", user);
+        result.put("queryTime", endTime - startTime + "ms");
+        result.put("strategy", "LOCK");
+        result.put("cacheName", "normalUser");
+        result.put("message", "普通数据，分布式锁防击穿，适合非热点场景");
         return result;
     }
 
